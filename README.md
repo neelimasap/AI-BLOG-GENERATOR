@@ -4,261 +4,244 @@ A comprehensive AI-powered blog post generator that creates high-quality, SEO-op
 
 ## Features
 
-- 🤖 **AI-Powered Content Generation**: Uses Anthropic Claude for writing and Groq for outlining
-- 🔍 **Multi-Source Research**: Combines Exa semantic search, SerpAPI Google results, and Firecrawl web scraping
-- 🎨 **Image Generation**: Creates relevant images using Fal.ai
-- 📊 **SEO Analysis**: Comprehensive SEO scoring and optimization recommendations
-- 🎨 **Modern UI**: Built with Next.js 14, Tailwind CSS, and shadcn/ui
-- 🗄️ **Database**: Supabase for data persistence with RLS security
-- ✅ **Testing**: Comprehensive Jest test suite with 80%+ coverage
+- AI-Powered Content Generation using Anthropic Claude for writing and Groq for outlining
+- Multi-Source Research combining Exa semantic search, SerpAPI Google results, and Firecrawl web scraping
+- Image Generation using Fal.ai for relevant visual content
+- SEO Analysis with comprehensive scoring and optimization recommendations
+- Modern UI built with Next.js 16, React 19, TypeScript, Tailwind CSS v4, and shadcn/ui
+- Database powered by Supabase with Row Level Security
+- Full test coverage with Jest and React Testing Library
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, shadcn/ui
-- **Backend**: Next.js API Routes, Supabase
-- **AI Services**: Anthropic Claude, Groq, Fal.ai
-- **Research**: Exa, SerpAPI, Firecrawl
-- **Database**: Supabase (PostgreSQL)
-- **Testing**: Jest, React Testing Library
-- **Deployment**: Vercel
+**Frontend**
+- Next.js 16.2.3 (App Router)
+- React 19.2.4
+- TypeScript 6.0.2
+- Tailwind CSS v4 with @tailwindcss/postcss
+- shadcn/ui components
 
-## Getting Started
+**Backend**
+- Next.js API Routes
+- Supabase (PostgreSQL)
 
-### Prerequisites
+**AI & Research**
+- Anthropic Claude (@anthropic-ai/sdk)
+- Groq (groq-sdk)
+- Exa semantic search (exa-js)
+- SerpAPI for web search
+- Firecrawl for web scraping (@mendable/firecrawl-js)
+- Fal.ai for image generation (@fal-ai/serverless-client)
 
-- Node.js 18+
-- npm or yarn
+**Tooling**
+- Package manager: Bun (required)
+- Build: Turbopack (enabled by default)
+- Testing: Jest 30, React Testing Library
+- Linting: ESLint 9 with eslint-config-next
+- Deployment: Vercel
+
+## Prerequisites
+
+- Bun 1.0 or higher
 - Supabase account
-- API keys for all AI services
+- API keys for AI services (see Environment Variables)
 
-### Installation
+## Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd ai-blog-generator
-   ```
+1. Clone the repository
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+```bash
+git clone <repository-url>
+cd ai-blog-generator
+```
 
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env.local
-   ```
+2. Install dependencies with Bun
 
-   Fill in all required environment variables (see Environment Variables section below).
+```bash
+bun install
+```
 
-4. **Set up Supabase**
-   ```bash
-   # Run the database migration
-   npx supabase db push
-   ```
+3. Set up environment variables
 
-5. **Run the development server**
-   ```bash
-   npm run dev
-   ```
+```bash
+cp .env.example .env.local
+```
 
-   Open [http://localhost:3000](http://localhost:3000) to view the application.
+Edit `.env.local` and fill in your API keys.
+
+4. Set up the database
+
+```bash
+bunx supabase db push
+```
+
+5. Start the development server
+
+```bash
+bun run dev
+```
+
+Open http://localhost:3000 to view the application.
 
 ## Environment Variables
 
-Create a `.env.local` file with the following variables:
+Create a `.env.local` file with these variables:
 
-```env
-# AI Service API Keys
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-GROQ_API_KEY=your_groq_api_key_here
+```
+# AI Services
+ANTHROPIC_API_KEY=your_anthropic_api_key
+GROQ_API_KEY=your_groq_api_key
 
 # Research APIs
-EXA_API_KEY=your_exa_api_key_here
-SERP_API_KEY=your_serp_api_key_here
-FIRECRAWL_API_KEY=your_firecrawl_api_key_here
+EXA_API_KEY=your_exa_api_key
+SERP_API_KEY=your_serp_api_key
+FIRECRAWL_API_KEY=your_firecrawl_api_key
 
 # Image Generation
 FAL_KEY=your_fal_key_id:your_fal_key_secret
 
-# Supabase Configuration
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_key
 ```
-
-### Getting API Keys
-
-- **Anthropic Claude**: [anthropic.com](https://anthropic.com)
-- **Groq**: [groq.com](https://groq.com)
-- **Exa**: [exa.ai](https://exa.ai)
-- **SerpAPI**: [serpapi.com](https://serpapi.com)
-- **Firecrawl**: [firecrawl.dev](https://firecrawl.dev)
-- **Fal.ai**: [fal.ai](https://fal.ai)
-- **Supabase**: [supabase.com](https://supabase.com)
 
 ## Database Setup
 
-The application uses Supabase for data persistence. The schema includes:
+The application uses Supabase with the following tables:
 
-- `projects`: Blog generation projects
-- `drafts`: Generated blog post drafts
-- `generated_posts`: Final published posts
+- `projects` - Blog generation sessions
+- `drafts` - Generated blog post drafts  
+- `generated_posts` - Final published content
 
-Run the migration to set up the database:
+Apply migrations:
 
 ```bash
-# Apply migrations
-npx supabase db push
-
-# Or run the SQL directly in Supabase dashboard
-# See supabase/migrations/ for the schema
+bunx supabase db push
 ```
 
-## Development
+All tables use Row Level Security (RLS). Ensure your Supabase project has appropriate policies configured.
 
-### Available Scripts
+## Development Scripts
 
 ```bash
-# Development server
-npm run dev
+# Development server with Turbopack
+bun run dev
 
-# Build for production
-npm run build
+# Production build
+bun run build
 
 # Start production server
-npm start
+bun run start
 
 # Run tests
-npm test
+bun run test
 
-# Run tests in watch mode
-npm run test:watch
+# Run tests with coverage
+bun run test -- --coverage
 
 # Lint code
-npm run lint
+bun run lint
 
-# Type checking
-npx tsc --noEmit
+# Type check
+bunx tsc --noEmit
 ```
 
-### Project Structure
+## Project Structure
 
 ```
 src/
-├── app/                    # Next.js App Router
-│   ├── api/               # API routes
-│   ├── fonts/             # Font files
-│   ├── globals.css        # Global styles
-│   └── layout.tsx         # Root layout
-├── components/            # React components
-│   ├── ui/               # shadcn/ui components
-│   └── workspace/        # App-specific components
-├── hooks/                # React hooks
-├── lib/                  # Utility functions and clients
-│   ├── ai/              # AI service clients
-│   ├── research/        # Research service clients
-│   └── supabase/        # Database clients
-└── types/               # TypeScript type definitions
+├── app/
+│   ├── api/
+│   │   ├── research/route.ts
+│   │   ├── generate/route.ts
+│   │   ├── image/route.ts
+│   │   └── seo-check/route.ts
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/
+│   ├── ui/
+│   └── workspace/
+├── lib/
+│   ├── ai/
+│   ├── research/
+│   ├── supabase/
+│   └── validators/
+├── hooks/
+└── types/
 ```
 
 ## Testing
 
-The project includes comprehensive testing with Jest and React Testing Library.
+Run the test suite:
 
 ```bash
-# Run all tests
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run tests with coverage
-npm test -- --coverage
+bun run test
 ```
 
-Test coverage includes:
-- API route logic
-- Component rendering
+Tests cover:
+- API route handlers
+- Component rendering and interaction
 - Error handling
 - Integration flows
 
 ## Deployment
 
-### Vercel Deployment
+### Vercel
 
-1. **Connect to Vercel**
-   ```bash
-   # Install Vercel CLI
-   npm i -g vercel
+1. Connect your repository to Vercel
+2. Add environment variables in Project Settings → Environment Variables
+3. Deploy:
 
-   # Login to Vercel
-   vercel login
-   ```
-
-2. **Deploy**
-   ```bash
-   # Deploy to production
-   vercel --prod
-
-   # Or deploy to preview
-   vercel
-   ```
-
-3. **Configure Environment Variables**
-   In the Vercel dashboard, add all environment variables from `.env.example`:
-   - Go to Project Settings → Environment Variables
-   - Add each variable with its production value
-
-4. **Database Configuration**
-   - Ensure Supabase project allows connections from Vercel's IP ranges
-   - Update CORS settings if needed
-   - Verify RLS policies are correctly configured
+```bash
+vercel --prod
+```
 
 ### Build Configuration
 
 The `vercel.json` file configures:
 - Next.js framework detection
-- API route runtime (Node.js 18.x)
-- Function timeout (30 seconds for AI processing)
-- Build commands and output directory
+- API route runtime settings
+- Function timeouts (30s for AI processing)
+- Build and install commands using Bun
 
 ## Architecture
 
 ### Data Flow
 
-1. **Topic Input** → Create Supabase project
-2. **Research Phase** → Exa + SerpAPI → Research results
-3. **Outline Phase** → Groq API → Structured outline
-4. **Draft Phase** → Anthropic Claude → Full blog post
-5. **Image Phase** → Fal.ai → Generated images
-6. **SEO Analysis** → Scoring and recommendations
+1. User submits topic and preferences
+2. System creates a project record in Supabase
+3. Research phase: Exa + SerpAPI + Firecrawl gather sources
+4. Outline phase: Groq generates structured outline
+5. Draft phase: Claude writes full blog post
+6. Image phase: Fal.ai generates relevant images
+7. SEO analysis: Content is scored and optimized
+8. Result: Generated post returned to user
 
 ### API Routes
 
-- `POST /api/research` - Multi-source research
+- `POST /api/research` - Multi-source research aggregation
 - `POST /api/generate` - Outline and draft generation
-- `POST /api/image` - Image generation
-- `POST /api/seo-check` - SEO analysis
+- `POST /api/image` - Image generation via Fal.ai
+- `POST /api/seo-check` - SEO analysis and scoring
 - `GET/POST /api/projects` - Project management
 - `GET/POST /api/posts` - Post management
 
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch: `git checkout -b feature/your-feature`
 3. Make your changes
 4. Add tests for new functionality
-5. Ensure all tests pass
+5. Ensure all checks pass: `bun run lint && bun run test && bunx tsc --noEmit`
 6. Submit a pull request
 
 ## License
 
-This project is licensed under the MIT License.
+MIT License. See LICENSE file for details.
 
 ## Support
 
-For support or questions:
-- Create an issue on GitHub
-- Check the documentation
-- Review the test cases for usage examples
+- Report bugs: Create an issue on GitHub
+- Questions: Check this README or review test cases
+- API issues: Verify your keys and service dashboards

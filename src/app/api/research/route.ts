@@ -3,12 +3,10 @@ import { ResearchRequestSchema } from '@/lib/validators/schema';
 import { searchExa } from '@/lib/research/exa';
 import { searchSerp } from '@/lib/research/serp';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = ResearchRequestSchema.safeParse(body);
+  
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }

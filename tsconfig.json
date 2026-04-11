@@ -1,26 +1,86 @@
 {
   "compilerOptions": {
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "allowJs": true,
-    "skipLibCheck": true,
-    "strict": true,
-    "noEmit": true,
-    "esModuleInterop": true,
+    // ======================================================================
+    // Language & Environment
+    // Defines JavaScript version and runtime environment
+    // ======================================================================
+    "target": "ESNext",
     "module": "esnext",
     "moduleResolution": "bundler",
-    "resolveJsonModule": true,
+    "lib": ["dom", "dom.iterable", "esnext"],
     "isolatedModules": true,
-    "jsx": "preserve",
-    "incremental": true,
+    "verbatimModuleSyntax": true,
+    // ======================================================================
+    // Type Safety - Foundation
+    // Core type checking settings for a robust codebase
+    // ======================================================================
+    "strict": true,
+    "alwaysStrict": true,
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    // ======================================================================
+    // Type Safety - Advanced
+    // Additional checks for higher code quality
+    // ======================================================================
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "useUnknownInCatchVariables": true,
+    "noImplicitOverride": true,
+    "types": ["bun", "node", "react", "react-dom"],
+    // ======================================================================
+    // Interoperability
+    // Settings for working with different file types and modules
+    // ======================================================================
+    "allowJs": true,
+    "checkJs": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    // ======================================================================
+    // Build & Performance
+    // Settings that affect compilation output and build performance
+    // ======================================================================
+    "skipLibCheck": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "forceConsistentCasingInFileNames": true,
+    // ======================================================================
+    // Project Structure
+    // Configure import paths and module resolution
+    // ======================================================================
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/public/*": ["./public/*"]
+    },
+    // ======================================================================
+    // Next.js Project Configuration
+    // Controls settings specific to Next.js framework
+    // ======================================================================
+    "jsx": "react-jsx", // Uses the React automatic runtime
+    "incremental": true, // Enable faster incremental builds
+    "noEmit": true, // Skip emitting files (Next.js handles this)
+    // Enable Next.js TypeScript plugin
     "plugins": [
       {
         "name": "next"
       }
-    ],
-    "paths": {
-      "@/*": ["./src/*"]
-    }
+    ] 
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  // Files to include/exclude from the project
+  "exclude": ["node_modules", "**/*.spec.ts", "**/*.e2e.ts"],
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".storybook/**/*.ts",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ]
 }
