@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase/server';
 
-export const runtime = 'nodejs';
-
 type Params = { params: { id: string } };
 
 export async function DELETE(_req: Request, { params }: Params) {

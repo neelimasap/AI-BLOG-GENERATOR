@@ -2,9 +2,6 @@ import { NextResponse } from 'next/server';
 import { UpdateProjectSchema } from '@/lib/validators/schema';
 import { getSupabaseServer } from '@/lib/supabase/server';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const supabase = getSupabaseServer();
   const { data, error } = await supabase

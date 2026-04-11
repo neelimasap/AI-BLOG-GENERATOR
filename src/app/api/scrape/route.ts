@@ -2,9 +2,6 @@ import { NextResponse } from 'next/server';
 import { ScrapeRequestSchema } from '@/lib/validators/schema';
 import { scrapeUrl } from '@/lib/research/firecrawl';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = ScrapeRequestSchema.safeParse(body);

@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { ResearchRequestSchema } from '@/lib/validators/schema';
 import { searchSerp } from '@/lib/research/serp';
 
-export const runtime = 'nodejs';
-
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = ResearchRequestSchema.safeParse(body);
