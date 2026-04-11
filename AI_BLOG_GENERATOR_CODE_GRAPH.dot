@@ -1,0 +1,67 @@
+digraph AI_BLOG_GENERATOR {
+  rankdir=LR;
+  node [shape=box, style=rounded, color="#333333", fontname="Helvetica"];
+
+  TopicInput [label="TopicInput\n(new project)"];
+  ProjectAPI [label="POST /api/projects\nproject creation"];
+  ProjectWorkspace [label="/projects/[id]\nworkspace shell"];
+  ResearchPanel [label="ResearchPanel\n(run research)" shape=component];
+  OutlineEditor [label="OutlineEditor\n(generate outline)" shape=component];
+  DraftEditor [label="DraftEditor\n(generate draft, autosave)" shape=component];
+  ImageGallery [label="ImageGallery\n(generate image)" shape=component];
+
+  ExaAPI [label="POST /api/research/exa\nExa search"];
+  SerpAPI [label="POST /api/research/serp\nSerp search"];
+  ScrapeAPI [label="POST /api/scrape\nFirecrawl scrape"];
+  OutlineAPI [label="POST /api/outline\nGroq outline"];
+  DraftAPI [label="POST /api/draft\nClaude draft"];
+  ImageAPI [label="POST /api/image\nFal.ai image"];
+  DraftPatch [label="PATCH /api/projects/:id/drafts/:draftId\ndraft autosave"];
+
+  SupabaseProjects [label="Supabase projects"];
+  SupabaseDrafts [label="Supabase drafts"];
+  SupabaseImages [label="Supabase generated_images"];
+  ExaSDK [label="Exa SDK"];
+  SerpApiService [label="SerpAPI service"];
+  FirecrawlSDK [label="Firecrawl SDK"];
+  GroqSDK [label="Groq SDK"];
+  ClaudeSDK [label="Anthropic SDK"];
+  FalSDK [label="Fal.ai client"];
+
+  TopicInput -> ProjectAPI;
+  ProjectAPI -> SupabaseProjects;
+  TopicInput -> ProjectWorkspace;
+
+  ProjectWorkspace -> ResearchPanel;
+  ProjectWorkspace -> OutlineEditor;
+  ProjectWorkspace -> DraftEditor;
+  ProjectWorkspace -> ImageGallery;
+
+  ResearchPanel -> ExaAPI;
+  ResearchPanel -> SerpAPI;
+  ResearchPanel -> ScrapeAPI;
+
+  ExaAPI -> ExaSDK;
+  SerpAPI -> SerpApiService;
+  ScrapeAPI -> FirecrawlSDK;
+
+  OutlineEditor -> OutlineAPI;
+  OutlineAPI -> GroqSDK;
+
+  DraftEditor -> DraftAPI;
+  DraftEditor -> DraftPatch;
+  DraftAPI -> ClaudeSDK;
+  DraftPatch -> SupabaseDrafts;
+
+  ImageGallery -> ImageAPI;
+  ImageAPI -> FalSDK;
+  ImageAPI -> SupabaseImages;
+
+  node [shape=ellipse];
+  WorkflowState [label="useWorkflowStore\n(Zustand)" shape=ellipse];
+  ProjectWorkspace -> WorkflowState [style=dashed];
+  ResearchPanel -> WorkflowState [style=dashed];
+  OutlineEditor -> WorkflowState [style=dashed];
+  DraftEditor -> WorkflowState [style=dashed];
+  ImageGallery -> WorkflowState [style=dashed];
+}
