@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Copy, ExternalLink, Trash2, FileText } from 'lucide-react';
@@ -110,25 +110,18 @@ export default function PostsPage() {
               const createdDate = new Date(post.created_at).toLocaleDateString();
 
               return (
-                <Card
-                  key={post.id}
-                  className="hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => router.push(`/posts/${post.id}`)}
-                >
-                  <CardHeader className="pb-3">
+                <div key={post.id} className="rounded-xl bg-card ring-1 ring-foreground/10 overflow-hidden hover:shadow-lg transition-shadow">
+                  <Link href={`/posts/${post.id}`} className="block p-4 pb-3 no-underline">
                     {post.image_url && (
-                      <img src={post.image_url} alt={title} className="w-full h-32 object-cover rounded-t-lg mb-3" />
+                      <img src={post.image_url} alt={title} className="w-full h-32 object-cover rounded-lg mb-3" />
                     )}
-                    <CardTitle className="text-lg line-clamp-2 font-sans">{title}</CardTitle>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <p className="text-base font-semibold line-clamp-2 font-sans text-foreground mb-2">{title}</p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
                       <Badge variant="outline" className="capitalize">{post.tone}</Badge>
                       <span>{createdDate}</span>
                     </div>
-                  </CardHeader>
-
-                  <CardContent>
                     <p className="text-sm text-muted-foreground mb-3 line-clamp-3">{post.seo_meta.description}</p>
-                    <div className="flex flex-wrap gap-1 mb-4">
+                    <div className="flex flex-wrap gap-1 mb-1">
                       {post.seo_meta.keywords.slice(0, 3).map((k, i) => (
                         <Badge key={i} variant="secondary" className="text-xs">{k}</Badge>
                       ))}
@@ -136,19 +129,19 @@ export default function PostsPage() {
                         <Badge variant="secondary" className="text-xs">+{post.seo_meta.keywords.length - 3}</Badge>
                       )}
                     </div>
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="flex-1" onClick={(e) => copyTitle(e, title)}>
-                        <Copy className="w-3 h-3 mr-1" />Copy
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={(e) => exportMarkdown(e, post)}>
-                        <ExternalLink className="w-3 h-3" />
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={(e) => deletePost(e, post.id)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  </Link>
+                  <div className="flex gap-2 px-4 pb-3">
+                    <Button size="sm" variant="outline" className="flex-1" onClick={(e) => copyTitle(e, title)}>
+                      <Copy className="w-3 h-3 mr-1" />Copy
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={(e) => exportMarkdown(e, post)}>
+                      <ExternalLink className="w-3 h-3" />
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={(e) => deletePost(e, post.id)}>
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
               );
             })}
           </div>

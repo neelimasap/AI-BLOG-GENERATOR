@@ -105,7 +105,18 @@ export default function PostDetailPage() {
       .then(r => r.ok ? r.json() : Promise.reject('Not found'))
       .then((data: SavedPost) => {
         setPost(data);
-        setParsed(JSON.parse(data.outline));
+        try {
+          setParsed(JSON.parse(data.outline));
+        } catch {
+          // outline is malformed — build a minimal parsed object from raw content
+          setParsed({
+            title: data.topic,
+            intro: '',
+            sections: [],
+            conclusion: '',
+            seo_meta: data.seo_meta,
+          });
+        }
       })
       .catch(() => router.push('/posts'))
       .finally(() => setLoading(false));
