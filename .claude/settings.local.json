@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm.cmd run:*)",
+      "Bash(curl -s -X POST http://localhost:3005/api/generate -H 'Content-Type: application/json' -d '{\"topic\":\"solar energy\",\"audience\":\"general\",\"tone\":\"professional\",\"research_sources\":[{\"title\":\"Solar\",\"url\":\"https://example.com\",\"snippet\":\"Solar is growing.\"}]}')",
+      "Bash(xxd)"
+    ]
+  }
+}

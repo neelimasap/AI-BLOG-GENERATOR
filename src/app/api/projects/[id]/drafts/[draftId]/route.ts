@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { UpdateDraftSchema } from '@/lib/validators/schema';
 import { getSupabaseServer } from '@/lib/supabase/server';
 
-export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 type Params = { params: { id: string; draftId: string } };

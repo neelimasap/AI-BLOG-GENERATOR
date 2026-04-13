@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { GenerateRequestSchema } from '@/lib/validators/schema';
 import { streamDraft, streamOutlineWithClaude } from '@/lib/ai/anthropic';
 
-export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {

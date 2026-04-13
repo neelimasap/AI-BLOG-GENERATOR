@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { ImageRequestSchema } from '@/lib/validators/schema';
 import { generateImage } from '@/lib/ai/fal';
 
-export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {

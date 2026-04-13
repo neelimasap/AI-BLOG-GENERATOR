@@ -3,7 +3,6 @@ import { ResearchRequestSchema } from '@/lib/validators/schema';
 import { searchExa } from '@/lib/research/exa';
 import { searchSerp } from '@/lib/research/serp';
 
-export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
