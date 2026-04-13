@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GenerateRequestSchema } from '@/lib/validators/schema';
+import { generateOutlineWithGemini } from '@/lib/ai/gemini';
+import { streamDraftWithMistral } from '@/lib/ai/mistral';
 import { streamDraft, streamOutlineWithClaude } from '@/lib/ai/anthropic';
 
 export const dynamic = 'force-dynamic';
@@ -29,25 +31,36 @@ export async function POST(request: Request) {
       .map(s => `${s.title}\n${s.content || s.snippet}`)
       .join('\n\n---\n\n');
 
-    const outlineText = await streamOutlineWithClaude(topic, audience, tone, researchSummary);
+    // Step 1: Generate outline with Gemini Flash (fallback to Claude Haiku)
+    let outlineText: string;
+    try {
+      outlineText = await generateOutlineWithGemini(topic, audience, tone, researchSummary);
+    } catch {
+      outlineText = await streamOutlineWithClaude(topic, audience, tone, researchSummary);
+    }
 
     let outline;
     try {
       outline = JSON.parse(outlineText);
-    } catch (e) {
+    } catch {
       throw new Error('Failed to parse outline JSON');
     }
 
     // Force the outline title to match the user's topic if the model drifted
     outline.title = outline.title || topic;
 
-    // Step 2: Generate full post with Claude using the outline and research
+    // Step 2: Generate full post with Mistral Large (fallback to Claude Sonnet)
     const researchContext = sources
       .map(s => `## ${s.title}\n${s.content || s.snippet}`)
       .join('\n\n')
-      .slice(0, 32000);
+      .slice(0, 16000);
 
-    const postStream = await streamDraft(outline, researchContext, tone, 800);
+    let postStream: ReadableStream<Uint8Array>;
+    try {
+      postStream = await streamDraftWithMistral(outline, researchContext, tone, 800);
+    } catch {
+      postStream = await streamDraft(outline, researchContext, tone, 800);
+    }
 
     // For now, return the stream directly - frontend will handle JSON parsing
     return new Response(postStream, {
