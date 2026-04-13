@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GenerateRequestSchema } from '@/lib/validators/schema';
 import { generateOutlineWithGemini } from '@/lib/ai/gemini';
-import { generateDraftWithMistral } from '@/lib/ai/mistral';
 import { streamOutlineWithClaude, generateDraftWithClaude } from '@/lib/ai/anthropic';
 
 export const dynamic = 'force-dynamic';
@@ -52,12 +51,7 @@ export async function POST(request: Request) {
       .join('\n\n')
       .slice(0, 4000);
 
-    let draftText: string;
-    try {
-      draftText = await generateDraftWithMistral(outline, researchContext, tone, 150);
-    } catch {
-      draftText = await generateDraftWithClaude(outline, researchContext, tone, 150);
-    }
+    const draftText = await generateDraftWithClaude(outline, researchContext, tone, 150);
 
     let draft;
     try {
