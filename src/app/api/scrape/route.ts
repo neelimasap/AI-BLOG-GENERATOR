@@ -4,6 +4,7 @@ import { scrapeUrl } from '@/lib/research/firecrawl';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 12;
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -13,7 +14,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const content = await scrapeUrl(parsed.data.url);
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Scrape timeout')), 8000)
+    );
+    const content = await Promise.race([scrapeUrl(parsed.data.url), timeout]);
     return NextResponse.json({ content });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Scrape failed';

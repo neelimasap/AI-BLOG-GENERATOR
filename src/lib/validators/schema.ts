@@ -86,7 +86,7 @@ export const SaveRequestSchema = z.object({
     description: z.string(),
     keywords: z.array(z.string()),
   }),
-  image_url: z.string().url().optional(),
+  image_url: z.string().url().optional().or(z.literal('')),
   sources: z.array(z.any()),
 });
 

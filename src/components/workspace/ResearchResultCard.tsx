@@ -32,8 +32,8 @@ export function ResearchResultCard({ result }: Props) {
       <Card className={`transition-colors cursor-pointer ${result.is_selected ? 'border-primary' : ''}`}
         onClick={() => toggleResearchSelected(result.id)}>
         <CardHeader className="pb-2">
-          <div className="flex items-start justify-between gap-2">
-            <CardTitle className="text-sm font-medium line-clamp-2">{result.title}</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="min-w-0 text-sm font-medium line-clamp-2">{result.title}</CardTitle>
             <Badge variant={result.source === 'exa' ? 'default' : 'secondary'} className="shrink-0">
               {result.source === 'exa' ? 'Exa' : 'Google'}
             </Badge>

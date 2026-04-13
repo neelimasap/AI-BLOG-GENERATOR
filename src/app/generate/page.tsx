@@ -1,14 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, Clock, Loader2, Search, FileText, Image, Save } from 'lucide-react';
+import {
+  CheckCircle, Loader2, Search, FileText, Image, Save,
+  RotateCcw, Copy, Code, Pencil, RefreshCw, Check, Clock,
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 import type { Tone } from '@/lib/types';
+import { toast } from 'sonner';
 
 interface ResearchSource {
   id: string;
@@ -23,6 +28,7 @@ interface GeneratedPost {
   intro: string;
   sections: Array<{ heading: string; content: string }>;
   conclusion: string;
+  suggestions?: string[];
   seo_meta: {
     title: string;
     description: string;
@@ -39,75 +45,160 @@ const steps = [
   { id: 'complete', label: 'Complete', icon: CheckCircle },
 ];
 
+const CACHE_KEY = 'blogResult';
+const FORM_KEY = 'blogForm';
+
+// Consistent sans-serif markdown renderers — no serif bleed from globals
+const mdComponents: Components = {
+  p: ({ children }) => <p className="mb-3 text-sm leading-relaxed text-foreground/80 font-sans">{children}</p>,
+  h2: ({ children }) => <h2 className="text-base font-semibold text-foreground font-sans mb-2 mt-4">{children}</h2>,
+  h3: ({ children }) => <h3 className="text-sm font-semibold text-foreground font-sans mb-1 mt-3">{children}</h3>,
+  ul: ({ children }) => <ul className="list-disc pl-5 mb-3 space-y-1 font-sans">{children}</ul>,
+  ol: ({ children }) => <ol className="list-decimal pl-5 mb-3 space-y-1 font-sans">{children}</ol>,
+  li: ({ children }) => <li className="text-sm text-foreground/80 font-sans">{children}</li>,
+  strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+  code: ({ children }) => <code className="bg-muted px-1 rounded text-xs font-mono">{children}</code>,
+};
+
+function wordCount(post: GeneratedPost): number {
+  const text = [post.intro, ...post.sections.map(s => s.content), post.conclusion].join(' ');
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+function readingTime(words: number): number {
+  return Math.max(1, Math.round(words / 200));
+}
+
+function postToMarkdown(post: GeneratedPost): string {
+  const lines = [
+    `# ${post.title}`,
+    '',
+    post.intro,
+    '',
+    ...post.sections.flatMap(s => [`## ${s.heading}`, '', s.content, '']),
+    '## Conclusion',
+    '',
+    post.conclusion,
+  ];
+  if (post.suggestions?.length) {
+    lines.push('', '## Suggestions & Next Steps', '');
+    post.suggestions.forEach((s, i) => lines.push(`${i + 1}. ${s}`));
+  }
+  return lines.join('\n');
+}
+
+function postToHtml(post: GeneratedPost): string {
+  const escape = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const lines = [
+    `<h1>${escape(post.title)}</h1>`,
+    `<p>${escape(post.intro)}</p>`,
+    ...post.sections.map(s => `<h2>${escape(s.heading)}</h2>\n<p>${escape(s.content)}</p>`),
+    `<h2>Conclusion</h2>\n<p>${escape(post.conclusion)}</p>`,
+  ];
+  if (post.suggestions?.length) {
+    lines.push('<h2>Suggestions &amp; Next Steps</h2>', '<ol>');
+    post.suggestions.forEach(s => lines.push(`  <li>${escape(s)}</li>`));
+    lines.push('</ol>');
+  }
+  return lines.join('\n');
+}
+
 export default function GeneratePage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState('research');
   const [progress, setProgress] = useState(0);
   const [sources, setSources] = useState<ResearchSource[]>([]);
   const [post, setPost] = useState<GeneratedPost | null>(null);
+  const [editablePost, setEditablePost] = useState<GeneratedPost | null>(null);
   const [streamingText, setStreamingText] = useState('');
   const [seoScore, setSeoScore] = useState<any>(null);
   const [error, setError] = useState<string>('');
   const [imageUrl, setImageUrl] = useState<string>('');
   const [formData, setFormData] = useState<any>({});
+  const [editMode, setEditMode] = useState(false);
+  const [copied, setCopied] = useState<'md' | 'html' | null>(null);
+  const [regeneratingSection, setRegeneratingSection] = useState<number | null>(null);
 
   useEffect(() => {
-    const storedFormData = JSON.parse(localStorage.getItem('blogForm') || '{}');
+    const storedFormData = JSON.parse(localStorage.getItem(FORM_KEY) || '{}');
     setFormData(storedFormData);
 
     if (!storedFormData.topic) {
       router.push('/');
       return;
     }
+
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      try {
+        const { post: cachedPost, sources: cachedSources, imageUrl: cachedImage, seoScore: cachedSeo, rawText } = JSON.parse(cached);
+        if (cachedPost?.title) {
+          setPost(cachedPost);
+          setEditablePost(cachedPost);
+          setSources(cachedSources || []);
+          setImageUrl(cachedImage || '');
+          setSeoScore(cachedSeo || null);
+          setStreamingText(rawText || '');
+          setCurrentStep('complete');
+          setProgress(100);
+          return;
+        }
+      } catch {
+        localStorage.removeItem(CACHE_KEY);
+      }
+    }
+
     startGeneration(storedFormData);
   }, []);
 
-  async function startGeneration(formData: any) {
+  async function startGeneration(data: any) {
     try {
-      // Step 1: Research
       setCurrentStep('research');
       setProgress(20);
 
       const researchRes = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: formData.topic, num_results: 8 }),
+        body: JSON.stringify({ query: data.topic, num_results: 8 }),
       });
-
       if (!researchRes.ok) throw new Error('Research failed');
       const { sources: researchSources } = await researchRes.json();
       setSources(researchSources);
 
-      // Step 2: Scrape top 3 sources
       setCurrentStep('scraping');
       setProgress(40);
 
-      const topSources = researchSources.slice(0, 3);
+      // Scrape top 5 in parallel — non-blocking, fall back to snippet if timeout
+      const topSources = researchSources.slice(0, 5);
       const scrapePromises = topSources.map(async (source: ResearchSource) => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 10000);
         try {
           const res = await fetch('/api/scrape', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url: source.url }),
+            signal: controller.signal,
           });
+          clearTimeout(timer);
           if (res.ok) {
             const { content } = await res.json();
             return { ...source, content };
           }
-        } catch (e) {
-          console.error('Scrape failed for', source.url);
+        } catch {
+          clearTimeout(timer);
         }
-        return source;
+        return source; // falls back to snippet from research
       });
 
       const scrapedSources = await Promise.all(scrapePromises);
-      setSources(scrapedSources);
+      // Merge: scraped top 5 + remaining sources with snippets for full context
+      const remainingSources = researchSources.slice(5);
+      const allSources = [...scrapedSources, ...remainingSources];
+      setSources(allSources);
 
-      // Step 3: Generate outline (built into generate API)
       setCurrentStep('outlining');
       setProgress(60);
-
-      // Step 4: Generate full post
       setCurrentStep('writing');
       setProgress(70);
 
@@ -115,53 +206,46 @@ export default function GeneratePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          topic: formData.topic,
-          audience: formData.audience,
-          tone: formData.tone,
-          research_sources: scrapedSources,
+          topic: data.topic,
+          audience: data.audience,
+          tone: data.tone,
+          research_sources: allSources,
         }),
       });
-
       if (!generateRes.ok) throw new Error('Generation failed');
 
       const reader = generateRes.body?.getReader();
       if (!reader) throw new Error('No response stream');
-
       const decoder = new TextDecoder();
       let accumulated = '';
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        accumulated += chunk;
+        accumulated += decoder.decode(value, { stream: true });
         setStreamingText(accumulated);
       }
 
       const cleaned = accumulated.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
       const generatedPost: GeneratedPost = JSON.parse(cleaned);
       setPost(generatedPost);
+      setEditablePost(generatedPost);
 
-      // Step 5: Generate image
       setCurrentStep('image');
       setProgress(90);
 
+      let finalImageUrl = '';
       const imageRes = await fetch('/api/image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: `Header image for blog post: ${generatedPost.title}`,
-          style: 'photorealistic',
-        }),
+        body: JSON.stringify({ prompt: `Header image for blog post: ${generatedPost.title}`, style: 'photorealistic' }),
       });
-
       if (imageRes.ok) {
         const imageData = await imageRes.json();
-        setImageUrl(imageData.url);
+        finalImageUrl = imageData.url;
+        setImageUrl(finalImageUrl);
       }
 
-      // Step 6: SEO check
+      let finalSeo = null;
       const seoRes = await fetch('/api/seo-check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,127 +256,212 @@ export default function GeneratePage() {
           keywords: generatedPost.seo_meta.keywords,
         }),
       });
-
       if (seoRes.ok) {
-        const seoData = await seoRes.json();
-        setSeoScore(seoData);
+        finalSeo = await seoRes.json();
+        setSeoScore(finalSeo);
       }
 
-      // Complete
+      localStorage.setItem(CACHE_KEY, JSON.stringify({
+        post: generatedPost,
+        sources: allSources,
+        imageUrl: finalImageUrl,
+        seoScore: finalSeo,
+        rawText: accumulated,
+      }));
+
       setCurrentStep('complete');
       setProgress(100);
-
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Generation failed');
     }
   }
 
-  async function savePost() {
-    if (!post) return;
-
+  async function regenerateSection(index: number) {
+    if (!editablePost) return;
+    setRegeneratingSection(index);
+    const section = editablePost.sections[index];
     try {
-      await fetch('/api/save', {
+      const res = await fetch('/api/regenerate-section', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          heading: section.heading,
+          current_content: section.content,
           topic: formData.topic,
           tone: formData.tone,
-          audience: formData.audience,
-          outline: JSON.stringify(post),
-          content: streamingText,
-          seo_meta: post.seo_meta,
-          image_url: imageUrl,
-          sources: sources,
         }),
       });
-
-      router.push('/posts');
+      if (!res.ok) throw new Error('Regeneration failed');
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error('No stream');
+      const decoder = new TextDecoder();
+      let newContent = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        newContent += decoder.decode(value, { stream: true });
+        setEditablePost(prev => {
+          if (!prev) return prev;
+          const sections = prev.sections.map((s, i) =>
+            i === index ? { ...s, content: newContent } : s
+          );
+          return { ...prev, sections };
+        });
+      }
     } catch (err) {
-      setError('Failed to save post');
+      // silently fail — section stays as-is
+    } finally {
+      setRegeneratingSection(null);
+    }
+  }
+
+  function regenerate() {
+    localStorage.removeItem(CACHE_KEY);
+    setPost(null);
+    setEditablePost(null);
+    setSources([]);
+    setImageUrl('');
+    setSeoScore(null);
+    setStreamingText('');
+    setError('');
+    setEditMode(false);
+    setCurrentStep('research');
+    setProgress(0);
+    startGeneration(formData);
+  }
+
+  async function copyAs(format: 'md' | 'html') {
+    if (!editablePost) return;
+    const text = format === 'md' ? postToMarkdown(editablePost) : postToHtml(editablePost);
+    await navigator.clipboard.writeText(text);
+    setCopied(format);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function savePost() {
+    console.log('savePost called, editablePost:', !!editablePost, 'formData:', formData);
+    if (!editablePost) { toast.error('No post to save'); return; }
+    try {
+      const payload = {
+        topic: formData.topic,
+        tone: formData.tone,
+        audience: formData.audience,
+        outline: JSON.stringify(editablePost),
+        content: streamingText,
+        seo_meta: editablePost.seo_meta,
+        image_url: imageUrl || undefined,
+        sources,
+      };
+      const res = await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setError(`Save failed: ${JSON.stringify(err)}`);
+        toast.error(`Save failed: ${JSON.stringify(err)}`);
+        return;
+      }
+      toast.success('Post saved!');
+      router.push('/posts');
+    } catch (e) {
+      setError(`Save failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
-  const CurrentIcon = steps[currentStepIndex]?.icon || Clock;
+  const isComplete = currentStep === 'complete';
+  const displayPost = editablePost;
+  const words = displayPost ? wordCount(displayPost) : 0;
+  const readMins = readingTime(words);
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Generating: {formData.topic}</h1>
-          <Progress value={progress} className="mb-4" />
+    <div className="min-h-screen bg-background py-10 font-sans">
+      <div className="container mx-auto px-6 max-w-6xl">
 
-          <div className="flex items-center gap-2 mb-4">
-            <CurrentIcon className="w-5 h-5" />
-            <span className="font-medium">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="font-heading text-3xl font-bold mb-1 text-foreground">
+            {isComplete ? formData.topic : `Generating: ${formData.topic}`}
+          </h1>
+          {!isComplete && (
+            <p className="text-muted-foreground text-sm mb-4 font-sans">
               {steps[currentStepIndex]?.label || 'Processing...'}
-            </span>
-            {currentStep === 'writing' && (
-              <Badge variant="secondary">Streaming live...</Badge>
-            )}
-          </div>
+              {currentStep === 'writing' && (
+                <span className="ml-2 text-primary font-medium">Streaming live...</span>
+              )}
+            </p>
+          )}
+          <Progress value={progress} className="h-2" />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Progress Sidebar */}
-          <div className="lg:col-span-1">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+
+          {/* Sidebar */}
+          <div className="lg:col-span-1 space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Progress</CardTitle>
+                <CardTitle className="font-sans">Progress</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 {steps.map((step, index) => {
                   const Icon = step.icon;
-                  const isCompleted = index < currentStepIndex;
-                  const isCurrent = index === currentStepIndex;
-
+                  const isCompleted = index < currentStepIndex || isComplete;
+                  const isCurrent = index === currentStepIndex && !isComplete;
                   return (
                     <div key={step.id} className="flex items-center gap-3">
-                      <div className={`p-1 rounded-full ${
-                        isCompleted ? 'bg-green-100 text-green-600' :
-                        isCurrent ? 'bg-blue-100 text-blue-600' :
-                        'bg-gray-100 text-gray-400'
+                      <div className={`p-1 rounded-full flex-shrink-0 ${
+                        isCompleted ? 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' :
+                        isCurrent ? 'bg-primary/10 text-primary' :
+                        'bg-muted text-muted-foreground'
                       }`}>
-                        {isCompleted ? (
-                          <CheckCircle className="w-4 h-4" />
-                        ) : isCurrent ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Icon className="w-4 h-4" />
-                        )}
+                        {isCompleted ? <CheckCircle className="w-4 h-4" /> :
+                         isCurrent ? <Loader2 className="w-4 h-4 animate-spin" /> :
+                         <Icon className="w-4 h-4" />}
                       </div>
-                      <span className={`text-sm ${
-                        isCompleted ? 'text-green-600' :
-                        isCurrent ? 'text-blue-600' :
-                        'text-gray-500'
-                      }`}>
-                        {step.label}
-                      </span>
+                      <span className={`text-sm font-sans ${
+                        isCompleted ? 'text-green-600 dark:text-green-400' :
+                        isCurrent ? 'text-primary font-medium' :
+                        'text-muted-foreground'
+                      }`}>{step.label}</span>
                     </div>
                   );
                 })}
               </CardContent>
             </Card>
 
+            {/* Word count + reading time */}
+            {displayPost && (
+              <Card>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm font-sans">
+                    <Clock className="w-4 h-4" />
+                    <span>{words.toLocaleString()} words · {readMins} min read</span>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Sources */}
             {sources.length > 0 && (
-              <Card className="mt-4">
+              <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Research Sources ({sources.length})</CardTitle>
+                  <CardTitle className="font-sans">Sources ({sources.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {sources.slice(0, 5).map((source, i) => (
                       <div key={i} className="text-sm">
                         <a
                           href={source.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline font-medium"
+                          className="text-primary hover:underline font-medium leading-snug block font-sans"
                         >
                           {source.title}
                         </a>
-                        <p className="text-gray-600 text-xs mt-1 line-clamp-2">
+                        <p className="text-muted-foreground text-xs mt-0.5 line-clamp-2 font-sans">
                           {source.snippet}
                         </p>
                       </div>
@@ -304,141 +473,257 @@ export default function GeneratePage() {
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-3 space-y-6">
             {error && (
-              <Card className="mb-4 border-red-200">
+              <Card className="border-destructive/50">
                 <CardContent className="pt-6">
-                  <p className="text-red-600">{error}</p>
+                  <p className="text-destructive font-sans">{error}</p>
+                  <Button variant="outline" size="sm" className="mt-3" onClick={regenerate}>
+                    Try again
+                  </Button>
                 </CardContent>
               </Card>
             )}
 
-            {/* Generated Content */}
-            {post && (
+            {/* Streaming preview */}
+            {currentStep === 'writing' && !displayPost && (
               <Card>
                 <CardHeader>
-                  <CardTitle>{post.title}</CardTitle>
-                  {imageUrl && (
-                    <img
-                      src={imageUrl}
-                      alt={post.title}
-                      className="w-full h-48 object-cover rounded-lg mt-4"
-                    />
-                  )}
+                  <CardTitle className="font-sans">Writing in progress...</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="prose dark:prose-invert max-w-none">
-                    <p className="text-lg font-medium mb-4">{post.intro}</p>
-
-                    {post.sections.map((section, i) => (
-                      <div key={i} className="mb-6">
-                        <h2 className="text-xl font-semibold mb-3">{section.heading}</h2>
-                        <div className="text-gray-700 dark:text-gray-300">
-                          <ReactMarkdown>{section.content}</ReactMarkdown>
-                        </div>
-                      </div>
-                    ))}
-
-                    <div className="mt-8 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                      <h3 className="font-semibold mb-2">Conclusion</h3>
-                      <p>{post.conclusion}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                    <h3 className="font-semibold mb-2">SEO Meta</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                      <strong>Title:</strong> {post.seo_meta.title}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      <strong>Description:</strong> {post.seo_meta.description}
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {post.seo_meta.keywords.map((keyword, i) => (
-                        <Badge key={i} variant="secondary" className="text-xs">
-                          {keyword}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  {seoScore && (
-                    <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                      <h3 className="font-semibold mb-3 flex items-center gap-2">
-                        SEO Score
-                        <Badge variant={seoScore.overall_score >= 80 ? "default" : "secondary"}>
-                          {seoScore.overall_score}/100
-                        </Badge>
-                      </h3>
-
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="font-medium">Readability</p>
-                          <p className="text-gray-600 dark:text-gray-400">
-                            Score: {seoScore.readability.score}/100
-                          </p>
-                          <p className="text-gray-600 dark:text-gray-400">
-                            {seoScore.readability.word_count} words, {seoScore.readability.reading_time_minutes} min read
-                          </p>
-                        </div>
-
-                        <div>
-                          <p className="font-medium">Title</p>
-                          <p className="text-gray-600 dark:text-gray-400">
-                            {seoScore.title.length} chars
-                          </p>
-                          <p className="text-xs text-gray-500">{seoScore.title.recommendation}</p>
-                        </div>
-
-                        <div>
-                          <p className="font-medium">Description</p>
-                          <p className="text-gray-600 dark:text-gray-400">
-                            {seoScore.description.length} chars
-                          </p>
-                          <p className="text-xs text-gray-500">{seoScore.description.recommendation}</p>
-                        </div>
-
-                        <div>
-                          <p className="font-medium">Keywords</p>
-                          <p className="text-gray-600 dark:text-gray-400">
-                            {Object.keys(seoScore.keywords.density).length} keywords
-                          </p>
-                          {seoScore.keywords.recommendations.length > 0 && (
-                            <p className="text-xs text-orange-600">
-                              {seoScore.keywords.recommendations[0]}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-6 flex gap-3">
-                    <Button onClick={savePost} className="flex-1">
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Post
-                    </Button>
-                    <Button variant="outline" onClick={() => router.push('/')}>
-                      Start Over
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Streaming preview during writing */}
-            {currentStep === 'writing' && !post && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Writing in progress...</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="font-mono text-sm whitespace-pre-wrap min-h-[200px] p-4 bg-gray-50 dark:bg-gray-800 rounded">
+                  <div className="font-mono text-sm whitespace-pre-wrap min-h-[200px] p-4 bg-muted rounded-lg">
                     {streamingText}
                     <span className="animate-pulse">|</span>
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Generated Post */}
+            {displayPost && (
+              <>
+                {imageUrl && (
+                  <div className="rounded-xl overflow-hidden">
+                    <img src={imageUrl} alt={displayPost.title} className="w-full h-64 object-cover" />
+                  </div>
+                )}
+
+                {/* Article body */}
+                <Card>
+                  <CardContent className="pt-8 pb-8 px-8">
+
+                    {/* Title */}
+                    {editMode ? (
+                      <input
+                        className="font-heading text-3xl font-bold mb-6 text-foreground leading-tight w-full bg-transparent border-b border-border focus:outline-none focus:border-primary pb-1"
+                        value={displayPost.title}
+                        onChange={e => setEditablePost(p => p ? { ...p, title: e.target.value } : p)}
+                      />
+                    ) : (
+                      <h1 className="font-heading text-3xl font-bold mb-6 text-foreground leading-tight">
+                        {displayPost.title}
+                      </h1>
+                    )}
+
+                    {/* Intro */}
+                    {editMode ? (
+                      <textarea
+                        className="text-base text-foreground/80 leading-relaxed mb-8 border-l-4 border-primary pl-4 w-full bg-transparent focus:outline-none resize-none font-sans"
+                        rows={4}
+                        value={displayPost.intro}
+                        onChange={e => setEditablePost(p => p ? { ...p, intro: e.target.value } : p)}
+                      />
+                    ) : (
+                      <p className="text-base text-foreground/80 leading-relaxed mb-8 border-l-4 border-primary pl-4 font-sans">
+                        {displayPost.intro}
+                      </p>
+                    )}
+
+                    {/* Sections */}
+                    {displayPost.sections.map((section, i) => (
+                      <div key={i} className="mb-8">
+                        <div className="flex items-center justify-between mb-3 gap-2">
+                          {editMode ? (
+                            <input
+                              className="text-xl font-semibold text-foreground font-sans w-full bg-transparent border-b border-border focus:outline-none focus:border-primary"
+                              value={section.heading}
+                              onChange={e => setEditablePost(p => {
+                                if (!p) return p;
+                                const sections = p.sections.map((s, si) =>
+                                  si === i ? { ...s, heading: e.target.value } : s
+                                );
+                                return { ...p, sections };
+                              })}
+                            />
+                          ) : (
+                            <h2 className="text-xl font-semibold text-foreground font-sans">{section.heading}</h2>
+                          )}
+                          <button
+                            onClick={() => regenerateSection(i)}
+                            disabled={regeneratingSection !== null}
+                            className="flex-shrink-0 flex items-center gap-1 text-xs text-muted-foreground hover:text-primary transition-colors disabled:opacity-40 font-sans"
+                            title="Regenerate this section"
+                          >
+                            {regeneratingSection === i
+                              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              : <RefreshCw className="w-3.5 h-3.5" />}
+                            <span className="hidden sm:inline">Regenerate</span>
+                          </button>
+                        </div>
+
+                        {editMode ? (
+                          <textarea
+                            className="text-sm text-foreground/80 leading-relaxed w-full bg-transparent focus:outline-none resize-none font-sans border border-border rounded-lg p-3 focus:border-primary"
+                            rows={8}
+                            value={section.content}
+                            onChange={e => setEditablePost(p => {
+                              if (!p) return p;
+                              const sections = p.sections.map((s, si) =>
+                                si === i ? { ...s, content: e.target.value } : s
+                              );
+                              return { ...p, sections };
+                            })}
+                          />
+                        ) : (
+                          <div>
+                            <ReactMarkdown components={mdComponents}>{section.content}</ReactMarkdown>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* Conclusion */}
+                    <div className="mt-8 p-5 bg-muted/50 rounded-xl border border-border">
+                      <h3 className="font-semibold text-foreground mb-2 font-sans">Conclusion</h3>
+                      {editMode ? (
+                        <textarea
+                          className="text-foreground/80 leading-relaxed w-full bg-transparent focus:outline-none resize-none text-sm font-sans"
+                          rows={4}
+                          value={displayPost.conclusion}
+                          onChange={e => setEditablePost(p => p ? { ...p, conclusion: e.target.value } : p)}
+                        />
+                      ) : (
+                        <p className="text-foreground/80 leading-relaxed text-sm font-sans">{displayPost.conclusion}</p>
+                      )}
+                    </div>
+
+                    {/* Suggestions */}
+                    {displayPost.suggestions && displayPost.suggestions.length > 0 && (
+                      <div className="mt-6 p-5 bg-primary/5 rounded-xl border border-primary/20">
+                        <h3 className="font-semibold text-foreground mb-3 font-sans">Suggestions & Next Steps</h3>
+                        <ul className="space-y-2">
+                          {displayPost.suggestions.map((suggestion, i) => (
+                            <li key={i} className="flex items-start gap-2 text-foreground/80 text-sm font-sans">
+                              <span className="text-primary font-bold mt-0.5">{i + 1}.</span>
+                              {suggestion}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* SEO Meta */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="font-sans">SEO Meta</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 font-sans">Title</p>
+                      <p className="text-sm text-foreground font-sans">{displayPost.seo_meta.title}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 font-sans">Description</p>
+                      <p className="text-sm text-foreground font-sans">{displayPost.seo_meta.description}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1 font-sans">Keywords</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {displayPost.seo_meta.keywords.map((keyword, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs font-sans">{keyword}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* SEO Score */}
+                {seoScore && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 font-sans">
+                        SEO Score
+                        <Badge variant={seoScore.overall_score >= 80 ? 'default' : 'secondary'}>
+                          {seoScore.overall_score}/100
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 gap-4 text-sm font-sans">
+                        <div>
+                          <p className="font-medium text-foreground">Readability</p>
+                          <p className="text-muted-foreground">{seoScore.readability.score}/100</p>
+                          <p className="text-muted-foreground text-xs">
+                            {seoScore.readability.word_count} words · {seoScore.readability.reading_time_minutes} min read
+                          </p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">Title</p>
+                          <p className="text-muted-foreground">{seoScore.title.length} chars</p>
+                          <p className="text-muted-foreground text-xs">{seoScore.title.recommendation}</p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">Description</p>
+                          <p className="text-muted-foreground">{seoScore.description.length} chars</p>
+                          <p className="text-muted-foreground text-xs">{seoScore.description.recommendation}</p>
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">Keywords</p>
+                          <p className="text-muted-foreground">{Object.keys(seoScore.keywords.density).length} tracked</p>
+                          {seoScore.keywords.recommendations.length > 0 && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                              {seoScore.keywords.recommendations[0]}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Actions */}
+                <div className="flex flex-wrap gap-3">
+                  <Button onClick={savePost} className="flex-1 min-w-[120px]">
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Post
+                  </Button>
+                  <Button
+                    variant={editMode ? 'default' : 'outline'}
+                    onClick={() => setEditMode(m => !m)}
+                  >
+                    <Pencil className="w-4 h-4 mr-2" />
+                    {editMode ? 'Done Editing' : 'Edit'}
+                  </Button>
+                  <Button variant="outline" onClick={() => copyAs('md')}>
+                    {copied === 'md' ? <Check className="w-4 h-4 mr-2" /> : <Copy className="w-4 h-4 mr-2" />}
+                    {copied === 'md' ? 'Copied!' : 'Copy MD'}
+                  </Button>
+                  <Button variant="outline" onClick={() => copyAs('html')}>
+                    {copied === 'html' ? <Check className="w-4 h-4 mr-2" /> : <Code className="w-4 h-4 mr-2" />}
+                    {copied === 'html' ? 'Copied!' : 'Copy HTML'}
+                  </Button>
+                  <Button variant="outline" onClick={regenerate}>
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Regenerate
+                  </Button>
+                  <Button variant="ghost" onClick={() => router.push('/')}>
+                    Start Over
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         </div>

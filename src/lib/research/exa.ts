@@ -19,11 +19,12 @@ export async function searchExa(
   numResults = 10,
 ): Promise<ResearchResult[]> {
   const client = getExaClient();
-  const response = await client.searchAndContents(query, {
+
+  // useAutoprompt:false + keyword search to prevent Exa rewriting the query
+  const response = await client.search(query, {
     numResults,
-    useAutoprompt: true,
-    text: { maxCharacters: 3000 },
-    highlights: { numSentences: 3, highlightsPerUrl: 2 },
+    useAutoprompt: false,
+    type: 'keyword',
   });
 
   return response.results.map(r => ({
@@ -31,8 +32,8 @@ export async function searchExa(
     source: 'exa' as const,
     title: r.title ?? 'Untitled',
     url: r.url,
-    snippet: (r.highlights?.join(' ') || r.text?.slice(0, 400)) ?? '',
-    published_date: r.publishedDate ?? null,
+    snippet: r.url, // no snippet from search-only, scraping will enrich
+    published_date: (r as any).publishedDate ?? null,
     full_content: null,
     is_selected: false,
     scraped_at: null,

@@ -24,7 +24,8 @@ export default function HomePage() {
     e.preventDefault();
     setLoading(true);
 
-    // Store in localStorage for the generate page
+    // Clear any cached result so new topic generates fresh
+    localStorage.removeItem('blogResult');
     localStorage.setItem('blogForm', JSON.stringify(form));
     router.push('/generate');
   }

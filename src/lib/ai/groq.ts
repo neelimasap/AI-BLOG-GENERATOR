@@ -37,15 +37,16 @@ export function buildOutlinePrompt(
 }
 No markdown, no explanation — only the JSON object.`;
 
-  const user = `Create a detailed blog outline for:
-Topic: ${topic}
+  const user = `Create a detailed blog outline strictly about this topic: "${topic}"
+
 Audience: ${audience}
 Tone: ${tone}
 
-Research context:
+Research context (use only what is relevant to "${topic}" — ignore off-topic content):
 ${researchSummary.slice(0, 4000)}
 
 Requirements:
+- The title and every section must be directly about "${topic}"
 - 5-8 main sections (H2)
 - 3-5 key points per section
 - Include an intro and conclusion section

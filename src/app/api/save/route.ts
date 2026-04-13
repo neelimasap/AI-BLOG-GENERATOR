@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       .select()
       .single();
 
-    if (error) throw new Error(error.message);
+    if (error) throw new Error(`Supabase error: ${error.message} | code: ${error.code} | details: ${error.details}`);
     return NextResponse.json(data, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Save failed';

@@ -1,6 +1,27 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## SESSION START — DO THIS FIRST, EVERY TIME
+1. Read `tasks/lessons.md` — mandatory, apply every rule
+2. Identify task complexity — 3+ steps = use planner agent before any code
+3. Check existing code with grep/glob before building anything new
+4. After writing any new file: run code-reviewer agent
+5. Root cause first — never patch symptoms
+
+## Skills to Use (Already Installed)
+- New feature (3+ steps): `/subagent-driven-development` — spec → implement → review in parallel
+- Debugging: `/systematic-debugging` — root-cause tracing before any fix
+- After writing code: `/requesting-code-review` — always
+- Before marking done: `/verification-before-completion` — prove it works
+- Parallel tasks: `/dispatching-parallel-agents` — scraping, SEO, image in parallel
+- New API route: `/tdd-workflow` — tests first
+
+## Known Hard Rules for This Project
+- Exa: ALWAYS `useAutoprompt: false`, `type: 'keyword'` — autoprompt returns completely wrong topics
+- Groq: free tier 100k tokens/day — do NOT use for large-context calls; use Claude Haiku instead
+- Supabase URL: must end in `.supabase.co` not `.supabase.co`
+- Optional URL fields in Zod: use `.optional().or(z.literal(''))` — empty string fails `.url()`
+- Delete `.next/` when app won't load — stale cache causes cryptic errors
+- image_url: always pass `undefined` not `''` when empty
 
 ## Stack
 

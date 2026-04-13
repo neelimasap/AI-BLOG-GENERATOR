@@ -40,6 +40,7 @@ Output ONLY valid JSON with this exact structure:
     }
   ],
   "conclusion": "Strong conclusion paragraph",
+  "suggestions": ["Actionable next step 1", "Actionable next step 2", "Actionable next step 3"],
   "seo_meta": {
     "title": "Meta title under 60 chars",
     "description": "Meta description under 155 chars",
@@ -53,17 +54,54 @@ Use markdown formatting within content fields. No preamble or explanation — on
     .map(s => `${'#'.repeat(s.level)} ${s.heading}\n${s.key_points.map(p => `- ${p}`).join('\n')}`)
     .join('\n\n');
 
-  const user = `Write a complete blog post based on this outline:
+  const user = `Write a complete blog post strictly about this topic: "${outline.title}"
 
+IMPORTANT: The research below may contain off-topic articles. Only use information that is directly relevant to "${outline.title}". Ignore anything unrelated. Do not let irrelevant research redirect the article topic.
+
+Outline to follow:
 ${outlineText}
 
-Use this research for supporting facts, quotes, and context:
-${researchContext.slice(0, 8000)}
+Research (use only what is relevant to the topic):
+${researchContext.slice(0, 24000)}
 
-Topic: ${outline.title}
-Target audience: The tone should adapt to engage this audience effectively.`;
+Stay on topic throughout. Every section must relate directly to "${outline.title}".`;
 
   return { system, user };
+}
+
+export async function streamOutlineWithClaude(
+  topic: string,
+  audience: string,
+  tone: Tone,
+  researchSummary: string,
+): Promise<string> {
+  const anthropicClient = getAnthropicClient();
+  const response = await anthropicClient.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 2048,
+    system: `You are an expert content strategist. Output ONLY valid JSON matching this schema exactly:
+{
+  "title": string,
+  "meta_description": string,
+  "sections": [{ "id": string, "heading": string, "level": 2, "key_points": string[], "estimated_words": number, "subsections": [] }],
+  "total_estimated_words": number
+}
+No markdown, no explanation — only the JSON object.`,
+    messages: [{
+      role: 'user',
+      content: `Create a detailed blog outline strictly about: "${topic}"
+Audience: ${audience}
+Tone: ${tone}
+
+Research (use only what is relevant to "${topic}"):
+${researchSummary.slice(0, 4000)}
+
+Requirements: 5-8 sections, 3-5 key points each, ~1500 words total. Every section must be about "${topic}".`,
+    }],
+  });
+
+  const text = response.content[0].type === 'text' ? response.content[0].text : '';
+  return text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
 }
 
 export async function streamDraft(
