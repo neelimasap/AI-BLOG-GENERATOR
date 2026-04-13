@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { GenerateRequestSchema } from '@/lib/validators/schema';
 import { generateOutlineWithGemini } from '@/lib/ai/gemini';
 import { generateDraftWithMistral } from '@/lib/ai/mistral';
-import { streamOutlineWithClaude } from '@/lib/ai/anthropic';
+import { streamOutlineWithClaude, generateDraftWithClaude } from '@/lib/ai/anthropic';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -52,9 +52,13 @@ export async function POST(request: Request) {
       .join('\n\n')
       .slice(0, 4000);
 
-    const draftText = await generateDraftWithMistral(outline, researchContext, tone, 150);
+    let draftText: string;
+    try {
+      draftText = await generateDraftWithMistral(outline, researchContext, tone, 150);
+    } catch {
+      draftText = await generateDraftWithClaude(outline, researchContext, tone, 150);
+    }
 
-    // Validate the draft JSON parses correctly before sending
     let draft;
     try {
       draft = JSON.parse(draftText);

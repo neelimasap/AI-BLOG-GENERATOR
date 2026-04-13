@@ -104,6 +104,24 @@ Requirements: 5-8 sections, 3-5 key points each, ~1500 words total. Every sectio
   return text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
 }
 
+export async function generateDraftWithClaude(
+  outline: Outline,
+  researchContext: string,
+  tone: Tone,
+  wordCount: number,
+): Promise<string> {
+  const { system, user } = buildDraftPrompt(outline, researchContext, tone, wordCount);
+  const anthropicClient = getAnthropicClient();
+  const response = await anthropicClient.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 3000,
+    system,
+    messages: [{ role: 'user', content: user }],
+  });
+  const text = response.content[0].type === 'text' ? response.content[0].text : '';
+  return text.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+}
+
 export async function streamDraft(
   outline: Outline,
   researchContext: string,
