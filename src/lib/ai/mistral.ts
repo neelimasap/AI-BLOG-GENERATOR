@@ -13,12 +13,12 @@ function getMistralClient(): Mistral {
   return client;
 }
 
-export async function streamDraftWithMistral(
+export async function generateDraftWithMistral(
   outline: Outline,
   researchContext: string,
   tone: Tone,
   wordCount: number,
-): Promise<ReadableStream<Uint8Array>> {
+): Promise<string> {
   const toneGuide: Record<Tone, string> = {
     professional: 'formal, authoritative, precise',
     conversational: 'friendly, accessible, first-person where natural',
@@ -31,60 +31,48 @@ export async function streamDraftWithMistral(
     .join('\n\n');
 
   const system = `You are an expert blog writer and SEO specialist. Write in a ${toneGuide[tone]} style.
-Target length: approximately ${wordCount} words.
+Target length: approximately ${wordCount} words per section.
 
-Output ONLY valid JSON with this exact structure:
+Output ONLY valid JSON with this exact structure — no other text before or after:
 {
   "title": "SEO-optimized title under 60 characters",
-  "intro": "Compelling introduction paragraph",
+  "intro": "Compelling introduction paragraph (2-3 sentences)",
   "sections": [
     {
       "heading": "Section heading",
-      "content": "Full section content in markdown format"
+      "content": "Section content (2-4 sentences per section)"
     }
   ],
-  "conclusion": "Strong conclusion paragraph",
-  "suggestions": ["Actionable next step 1", "Actionable next step 2", "Actionable next step 3"],
+  "conclusion": "Strong conclusion paragraph (2-3 sentences)",
+  "suggestions": ["Next step 1", "Next step 2", "Next step 3"],
   "seo_meta": {
     "title": "Meta title under 60 chars",
     "description": "Meta description under 155 chars",
     "keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5"]
   }
-}
+}`;
 
-Use markdown formatting within content fields. No preamble or explanation — only the JSON object.`;
+  const user = `Write a concise blog post about: "${outline.title}"
 
-  const user = `Write a complete blog post strictly about this topic: "${outline.title}"
+Keep each section to 2-4 sentences. Total output must be under 2000 tokens.
 
-IMPORTANT: Only use research that is directly relevant to "${outline.title}". Ignore anything unrelated.
-
-Outline to follow:
+Outline:
 ${outlineText}
 
-Research (use only what is relevant):
-${researchContext.slice(0, 16000)}
-
-Stay on topic throughout. Every section must relate directly to "${outline.title}".`;
+Research snippets:
+${researchContext.slice(0, 4000)}`;
 
   const mistral = getMistralClient();
-  const stream = await mistral.chat.stream({
-    model: 'mistral-large-latest',
+  const response = await mistral.chat.complete({
+    model: 'mistral-small-latest',
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
     ],
-    maxTokens: 4096,
+    maxTokens: 2500,
   });
 
-  const encoder = new TextEncoder();
-  return new ReadableStream<Uint8Array>({
-    async start(controller) {
-      for await (const chunk of stream) {
-        const content = chunk.data.choices[0]?.delta?.content;
-        const text = typeof content === 'string' ? content : '';
-        if (text) controller.enqueue(encoder.encode(text));
-      }
-      controller.close();
-    },
-  });
+  const text = response.choices?.[0]?.message?.content;
+  const str = typeof text === 'string' ? text : '';
+  return str.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
 }

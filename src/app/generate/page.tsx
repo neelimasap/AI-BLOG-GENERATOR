@@ -212,21 +212,13 @@ export default function GeneratePage() {
           research_sources: allSources,
         }),
       });
-      if (!generateRes.ok) throw new Error('Generation failed');
-
-      const reader = generateRes.body?.getReader();
-      if (!reader) throw new Error('No response stream');
-      const decoder = new TextDecoder();
-      let accumulated = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        accumulated += decoder.decode(value, { stream: true });
-        setStreamingText(accumulated);
+      if (!generateRes.ok) {
+        const errData = await generateRes.json().catch(() => ({ error: 'Generation failed' }));
+        throw new Error(errData.error || 'Generation failed');
       }
 
-      const cleaned = accumulated.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
-      const generatedPost: GeneratedPost = JSON.parse(cleaned);
+      const generatedPost: GeneratedPost = await generateRes.json();
+      setStreamingText(JSON.stringify(generatedPost));
       setPost(generatedPost);
       setEditablePost(generatedPost);
 
@@ -250,7 +242,7 @@ export default function GeneratePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: accumulated,
+          content: generatedPost.intro + ' ' + generatedPost.sections.map((s: any) => s.content).join(' '),
           title: generatedPost.seo_meta.title,
           description: generatedPost.seo_meta.description,
           keywords: generatedPost.seo_meta.keywords,
@@ -266,7 +258,7 @@ export default function GeneratePage() {
         sources: allSources,
         imageUrl: finalImageUrl,
         seoScore: finalSeo,
-        rawText: accumulated,
+        rawText: JSON.stringify(generatedPost),
       }));
 
       setCurrentStep('complete');

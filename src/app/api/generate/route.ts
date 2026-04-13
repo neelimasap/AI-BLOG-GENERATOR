@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { GenerateRequestSchema } from '@/lib/validators/schema';
 import { generateOutlineWithGemini } from '@/lib/ai/gemini';
-import { streamDraftWithMistral } from '@/lib/ai/mistral';
-import { streamDraft, streamOutlineWithClaude } from '@/lib/ai/anthropic';
+import { generateDraftWithMistral } from '@/lib/ai/mistral';
+import { streamOutlineWithClaude } from '@/lib/ai/anthropic';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -26,12 +26,11 @@ export async function POST(request: Request) {
     });
     const sources = relevantSources.length >= 2 ? relevantSources : research_sources;
 
-    // Step 1: Generate outline with Groq
     const researchSummary = sources
       .map(s => `${s.title}\n${s.content || s.snippet}`)
       .join('\n\n---\n\n');
 
-    // Step 1: Generate outline with Gemini Flash (fallback to Claude Haiku)
+    // Step 1: Outline with Gemini Flash (fallback to Claude Haiku)
     let outlineText: string;
     try {
       outlineText = await generateOutlineWithGemini(topic, audience, tone, researchSummary);
@@ -45,27 +44,25 @@ export async function POST(request: Request) {
     } catch {
       throw new Error('Failed to parse outline JSON');
     }
-
-    // Force the outline title to match the user's topic if the model drifted
     outline.title = outline.title || topic;
 
-    // Step 2: Generate full post with Mistral Large (fallback to Claude Sonnet)
+    // Step 2: Draft with Mistral Small (non-streaming, returns complete JSON)
     const researchContext = sources
       .map(s => `## ${s.title}\n${s.content || s.snippet}`)
       .join('\n\n')
-      .slice(0, 16000);
+      .slice(0, 4000);
 
-    let postStream: ReadableStream<Uint8Array>;
+    const draftText = await generateDraftWithMistral(outline, researchContext, tone, 150);
+
+    // Validate the draft JSON parses correctly before sending
+    let draft;
     try {
-      postStream = await streamDraftWithMistral(outline, researchContext, tone, 800);
+      draft = JSON.parse(draftText);
     } catch {
-      postStream = await streamDraft(outline, researchContext, tone, 800);
+      throw new Error('Draft generation produced invalid JSON');
     }
 
-    // For now, return the stream directly - frontend will handle JSON parsing
-    return new Response(postStream, {
-      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
-    });
+    return NextResponse.json(draft);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Generation failed';
     return NextResponse.json({ error: message }, { status: 500 });
