@@ -3,6 +3,7 @@ import { GenerateRequestSchema } from '@/lib/validators/schema';
 import { streamDraft, streamOutlineWithClaude } from '@/lib/ai/anthropic';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       .join('\n\n')
       .slice(0, 32000);
 
-    const postStream = await streamDraft(outline, researchContext, tone, 1500);
+    const postStream = await streamDraft(outline, researchContext, tone, 800);
 
     // For now, return the stream directly - frontend will handle JSON parsing
     return new Response(postStream, {
