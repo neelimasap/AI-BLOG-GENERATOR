@@ -2,11 +2,16 @@
 
 import { POST } from '@/app/api/save/route';
 
+const generateImageMock = jest.fn();
 const insertMock = jest.fn();
 const selectMock = jest.fn();
 const singleMock = jest.fn();
 const fromMock = jest.fn();
 const getSupabaseServerMock = jest.fn();
+
+jest.mock('@/lib/ai/fal', () => ({
+  generateImage: (...args: unknown[]) => generateImageMock(...args),
+}));
 
 jest.mock('@/lib/supabase/server', () => ({
   getSupabaseServer: () => getSupabaseServerMock(),
@@ -20,9 +25,10 @@ describe('POST /api/save', () => {
     insertMock.mockReturnValue({ select: selectMock });
     fromMock.mockReturnValue({ insert: insertMock });
     getSupabaseServerMock.mockReturnValue({ from: fromMock });
+    generateImageMock.mockResolvedValue({ url: 'https://cdn.example.com/generated-cover.png' });
   });
 
-  it('saves a generated post with sources as a JSON array payload', async () => {
+  it('generates a cover image during save when the client has not attached one yet', async () => {
     const request = new Request('http://localhost/api/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -64,7 +70,7 @@ describe('POST /api/save', () => {
         description: 'SEO description',
         keywords: ['a', 'b'],
       },
-      image_url: null,
+      image_url: 'https://cdn.example.com/generated-cover.png',
       sources: [
         {
           title: 'Example',
@@ -73,6 +79,39 @@ describe('POST /api/save', () => {
         },
       ],
     });
+    expect(generateImageMock).toHaveBeenCalledWith(
+      expect.stringContaining('Blog cover image for "Test"'),
+      'photorealistic',
+    );
+  });
+
+  it('uses the provided image URL without generating a new one', async () => {
+    const request = new Request('http://localhost/api/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic: 'Test topic',
+        tone: 'technical',
+        audience: 'developers',
+        outline: '{"title":"Test"}',
+        content: '{"title":"Test"}',
+        seo_meta: {
+          title: 'SEO title',
+          description: 'SEO description',
+          keywords: ['a', 'b'],
+        },
+        image_url: 'https://cdn.example.com/client-image.png',
+        sources: [],
+      }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(201);
+    expect(generateImageMock).not.toHaveBeenCalled();
+    expect(insertMock).toHaveBeenCalledWith(expect.objectContaining({
+      image_url: 'https://cdn.example.com/client-image.png',
+    }));
   });
 
   it('returns 400 for invalid save payloads', async () => {

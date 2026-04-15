@@ -429,6 +429,7 @@ export default function GeneratePage() {
 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
   const isComplete = currentStep === 'complete';
+  const isFinishingGeneration = !isComplete;
   const displayPost = editablePost;
   const words = displayPost ? wordCount(displayPost) : 0;
   const readMins = readingTime(words);
@@ -753,9 +754,9 @@ export default function GeneratePage() {
 
                 {/* Actions */}
                 <div className="flex flex-wrap gap-3">
-                  <Button onClick={savePost} className="flex-1 min-w-[120px]" disabled={saving}>
+                  <Button onClick={savePost} className="flex-1 min-w-[120px]" disabled={saving || isFinishingGeneration}>
                     {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
-                    {saving ? 'Saving...' : 'Save Post'}
+                    {saving ? 'Saving...' : isFinishingGeneration ? 'Finishing Generation...' : 'Save Post'}
                   </Button>
                   <Button
                     variant={editMode ? 'default' : 'outline'}
