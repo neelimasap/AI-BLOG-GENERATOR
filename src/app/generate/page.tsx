@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,42 @@ interface GeneratedPost {
   };
 }
 
+interface BlogFormData {
+  topic: string;
+  audience: string;
+  tone: Tone;
+  customInstructions?: string;
+}
+
+interface SeoScore {
+  overall_score: number;
+  readability: {
+    score: number;
+    word_count: number;
+    reading_time_minutes: number;
+  };
+  title: {
+    length: number;
+    recommendation: string;
+  };
+  description: {
+    length: number;
+    recommendation: string;
+  };
+  keywords: {
+    density: Record<string, number>;
+    recommendations: string[];
+  };
+}
+
+interface CachedGenerationResult {
+  post?: GeneratedPost;
+  sources?: ResearchSource[];
+  imageUrl?: string;
+  seoScore?: SeoScore | null;
+  rawText?: string;
+}
+
 const steps = [
   { id: 'research', label: 'Researching', icon: Search },
   { id: 'scraping', label: 'Scraping Sources', icon: FileText },
@@ -47,6 +83,12 @@ const steps = [
 
 const CACHE_KEY = 'blogResult';
 const FORM_KEY = 'blogForm';
+const defaultFormData: BlogFormData = {
+  topic: '',
+  audience: 'general readers',
+  tone: 'professional',
+  customInstructions: '',
+};
 
 // Consistent sans-serif markdown renderers — no serif bleed from globals
 const mdComponents: Components = {
@@ -103,24 +145,38 @@ function postToHtml(post: GeneratedPost): string {
   return lines.join('\n');
 }
 
+function parseStoredFormData(raw: string | null): BlogFormData {
+  if (!raw) return defaultFormData;
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<BlogFormData>;
+    return {
+      ...defaultFormData,
+      ...parsed,
+    };
+  } catch {
+    return defaultFormData;
+  }
+}
+
 export default function GeneratePage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState('research');
   const [progress, setProgress] = useState(0);
   const [sources, setSources] = useState<ResearchSource[]>([]);
-  const [post, setPost] = useState<GeneratedPost | null>(null);
   const [editablePost, setEditablePost] = useState<GeneratedPost | null>(null);
   const [streamingText, setStreamingText] = useState('');
-  const [seoScore, setSeoScore] = useState<any>(null);
+  const [seoScore, setSeoScore] = useState<SeoScore | null>(null);
   const [error, setError] = useState<string>('');
   const [imageUrl, setImageUrl] = useState<string>('');
-  const [formData, setFormData] = useState<any>({});
+  const [formData, setFormData] = useState<BlogFormData>(defaultFormData);
   const [editMode, setEditMode] = useState(false);
   const [copied, setCopied] = useState<'md' | 'html' | null>(null);
   const [regeneratingSection, setRegeneratingSection] = useState<number | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const storedFormData = JSON.parse(localStorage.getItem(FORM_KEY) || '{}');
+    const storedFormData = parseStoredFormData(localStorage.getItem(FORM_KEY));
     setFormData(storedFormData);
 
     if (!storedFormData.topic) {
@@ -131,9 +187,14 @@ export default function GeneratePage() {
     const cached = localStorage.getItem(CACHE_KEY);
     if (cached) {
       try {
-        const { post: cachedPost, sources: cachedSources, imageUrl: cachedImage, seoScore: cachedSeo, rawText } = JSON.parse(cached);
+        const {
+          post: cachedPost,
+          sources: cachedSources,
+          imageUrl: cachedImage,
+          seoScore: cachedSeo,
+          rawText,
+        } = JSON.parse(cached) as CachedGenerationResult;
         if (cachedPost?.title) {
-          setPost(cachedPost);
           setEditablePost(cachedPost);
           setSources(cachedSources || []);
           setImageUrl(cachedImage || '');
@@ -149,9 +210,9 @@ export default function GeneratePage() {
     }
 
     startGeneration(storedFormData);
-  }, []);
+  }, [router]);
 
-  async function startGeneration(data: any) {
+  async function startGeneration(data: BlogFormData) {
     try {
       setCurrentStep('research');
       setProgress(20);
@@ -219,7 +280,6 @@ export default function GeneratePage() {
 
       const generatedPost: GeneratedPost = await generateRes.json();
       setStreamingText(JSON.stringify(generatedPost));
-      setPost(generatedPost);
       setEditablePost(generatedPost);
 
       setCurrentStep('image');
@@ -242,7 +302,7 @@ export default function GeneratePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: generatedPost.intro + ' ' + generatedPost.sections.map((s: any) => s.content).join(' '),
+          content: generatedPost.intro + ' ' + generatedPost.sections.map((s) => s.content).join(' '),
           title: generatedPost.seo_meta.title,
           description: generatedPost.seo_meta.description,
           keywords: generatedPost.seo_meta.keywords,
@@ -300,7 +360,7 @@ export default function GeneratePage() {
           return { ...prev, sections };
         });
       }
-    } catch (err) {
+    } catch {
       // silently fail — section stays as-is
     } finally {
       setRegeneratingSection(null);
@@ -309,7 +369,6 @@ export default function GeneratePage() {
 
   function regenerate() {
     localStorage.removeItem(CACHE_KEY);
-    setPost(null);
     setEditablePost(null);
     setSources([]);
     setImageUrl('');
@@ -331,15 +390,16 @@ export default function GeneratePage() {
   }
 
   async function savePost() {
-    console.log('savePost called, editablePost:', !!editablePost, 'formData:', formData);
     if (!editablePost) { toast.error('No post to save'); return; }
+    setSaving(true);
     try {
+      const serializedPost = JSON.stringify(editablePost);
       const payload = {
         topic: formData.topic,
         tone: formData.tone,
         audience: formData.audience,
-        outline: JSON.stringify(editablePost),
-        content: streamingText,
+        outline: serializedPost,
+        content: postToMarkdown(editablePost),
         seo_meta: editablePost.seo_meta,
         image_url: imageUrl || undefined,
         sources,
@@ -355,10 +415,15 @@ export default function GeneratePage() {
         toast.error(`Save failed: ${JSON.stringify(err)}`);
         return;
       }
+      await res.json();
+      localStorage.removeItem(CACHE_KEY);
       toast.success('Post saved!');
       router.push('/posts');
     } catch (e) {
       setError(`Save failed: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(e instanceof Error ? e.message : 'Save failed');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -688,9 +753,9 @@ export default function GeneratePage() {
 
                 {/* Actions */}
                 <div className="flex flex-wrap gap-3">
-                  <Button onClick={savePost} className="flex-1 min-w-[120px]">
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Post
+                  <Button onClick={savePost} className="flex-1 min-w-[120px]" disabled={saving}>
+                    {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                    {saving ? 'Saving...' : 'Save Post'}
                   </Button>
                   <Button
                     variant={editMode ? 'default' : 'outline'}

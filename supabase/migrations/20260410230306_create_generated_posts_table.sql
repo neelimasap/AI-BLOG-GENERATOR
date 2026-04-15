@@ -8,7 +8,7 @@ CREATE TABLE generated_posts (
   content TEXT,
   seo_meta JSONB,
   image_url TEXT,
-  sources JSONB[],
+  sources JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

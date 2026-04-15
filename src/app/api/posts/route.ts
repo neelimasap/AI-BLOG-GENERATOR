@@ -7,7 +7,7 @@ export async function GET() {
   const supabase = getSupabaseServer();
   const { data, error } = await supabase
     .from('generated_posts')
-    .select('*')
+    .select('id, topic, tone, audience, outline, content, seo_meta, image_url, created_at')
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

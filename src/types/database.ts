@@ -19,7 +19,7 @@ export interface Database {
           content: string | null
           seo_meta: Json | null
           image_url: string | null
-          sources: Json[] | null
+          sources: Json | null
           created_at: string
         }
         Insert: {
@@ -31,7 +31,7 @@ export interface Database {
           content?: string | null
           seo_meta?: Json | null
           image_url?: string | null
-          sources?: Json[] | null
+          sources?: Json | null
           created_at?: string
         }
         Update: {
@@ -43,7 +43,7 @@ export interface Database {
           content?: string | null
           seo_meta?: Json | null
           image_url?: string | null
-          sources?: Json[] | null
+          sources?: Json | null
           created_at?: string
         }
         Relationships: []

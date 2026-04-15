@@ -1,5 +1,7 @@
 import { streamOutline } from '@/lib/ai/groq';
 import { streamDraft } from '@/lib/ai/anthropic';
+import { TextDecoder, TextEncoder } from 'util';
+import { ReadableStream } from 'stream/web';
 
 // Mock the AI services
 jest.mock('@/lib/ai/groq');
@@ -8,36 +10,34 @@ jest.mock('@/lib/ai/anthropic');
 const mockStreamOutline = streamOutline as jest.MockedFunction<typeof streamOutline>;
 const mockStreamDraft = streamDraft as jest.MockedFunction<typeof streamDraft>;
 
+function createMockStream(chunks: string[]): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder();
+
+  return new ReadableStream({
+    start(controller) {
+      chunks.forEach((chunk) => controller.enqueue(encoder.encode(chunk)));
+      controller.close();
+    },
+  });
+}
+
 describe('Generate API logic', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    Object.assign(global, { TextEncoder, TextDecoder, ReadableStream });
   });
 
   it('should call streamOutline with correct parameters', async () => {
-    const mockOutlineStream = {
-      getReader: () => ({
-        read: jest.fn()
-          .mockResolvedValueOnce({
-            done: false,
-            value: Buffer.from('{"title":"Test Title","sections":[],"meta_description":"Test desc","total_estimated_words":100}')
-          })
-          .mockResolvedValueOnce({ done: true, value: undefined }),
-      }),
-    };
+    const mockOutlineStream = createMockStream([
+      '{"title":"Test Title","sections":[],"meta_description":"Test desc","total_estimated_words":100}',
+    ]);
 
-    const mockDraftStream = {
-      getReader: () => ({
-        read: jest.fn()
-          .mockResolvedValueOnce({
-            done: false,
-            value: Buffer.from('{"title":"Test Title","intro":"Test intro","sections":[],"conclusion":"Test conclusion","seo_meta":{"title":"Test","description":"Test","keywords":["test"]}}')
-          })
-          .mockResolvedValueOnce({ done: true, value: undefined }),
-      }),
-    };
+    const mockDraftStream = createMockStream([
+      '{"title":"Test Title","intro":"Test intro","sections":[],"conclusion":"Test conclusion","seo_meta":{"title":"Test","description":"Test","keywords":["test"]}}',
+    ]);
 
-    mockStreamOutline.mockResolvedValue(mockOutlineStream as any);
-    mockStreamDraft.mockResolvedValue(mockDraftStream as any);
+    mockStreamOutline.mockResolvedValue(mockOutlineStream);
+    mockStreamDraft.mockResolvedValue(mockDraftStream);
 
     // Simulate the API logic
     const topic = 'Test Topic';
@@ -56,12 +56,14 @@ describe('Generate API logic', () => {
 
     // Read the outline stream
     const outlineReader = outlineStreamResult.getReader();
+    const decoder = new TextDecoder();
     let outlineText = '';
     while (true) {
       const { done, value } = await outlineReader.read();
       if (done) break;
-      outlineText += value.toString();
+      outlineText += decoder.decode(value, { stream: true });
     }
+    outlineText += decoder.decode();
 
     const outline = JSON.parse(outlineText);
 
@@ -80,26 +82,22 @@ describe('Generate API logic', () => {
   });
 
   it('should handle outline parsing errors', async () => {
-    const mockOutlineStream = {
-      getReader: () => ({
-        read: jest.fn()
-          .mockResolvedValueOnce({ done: false, value: Buffer.from('invalid json') })
-          .mockResolvedValueOnce({ done: true, value: undefined }),
-      }),
-    };
+    const mockOutlineStream = createMockStream(['invalid json']);
 
-    mockStreamOutline.mockResolvedValue(mockOutlineStream as any);
+    mockStreamOutline.mockResolvedValue(mockOutlineStream);
 
     const researchSummary = 'test research';
     const outlineStreamResult = await streamOutline('topic', 'audience', 'tone', researchSummary);
     const outlineReader = outlineStreamResult.getReader();
+    const decoder = new TextDecoder();
     let outlineText = '';
 
     while (true) {
       const { done, value } = await outlineReader.read();
       if (done) break;
-      outlineText += value.toString();
+      outlineText += decoder.decode(value, { stream: true });
     }
+    outlineText += decoder.decode();
 
     expect(() => JSON.parse(outlineText)).toThrow();
   });

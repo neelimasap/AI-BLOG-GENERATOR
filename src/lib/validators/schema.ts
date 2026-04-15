@@ -32,7 +32,7 @@ export const DraftRequestSchema = z.object({
 export const ImageRequestSchema = z.object({
   prompt: z.string().min(1).max(1000),
   style: z.enum(['photorealistic', 'illustration', 'diagram', 'infographic']),
-  project_id: z.string().uuid(),
+  project_id: z.string().uuid().optional(),
 });
 
 export const CreateProjectSchema = z.object({

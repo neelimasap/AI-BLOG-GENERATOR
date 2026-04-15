@@ -3,7 +3,10 @@
     "allow": [
       "Bash(npm.cmd run:*)",
       "Bash(curl -s -X POST http://localhost:3005/api/generate -H 'Content-Type: application/json' -d '{\"topic\":\"solar energy\",\"audience\":\"general\",\"tone\":\"professional\",\"research_sources\":[{\"title\":\"Solar\",\"url\":\"https://example.com\",\"snippet\":\"Solar is growing.\"}]}')",
-      "Bash(xxd)"
+      "Bash(xxd)",
+      "Bash(npx tsc:*)",
+      "Bash(code \"C:/Users/opera/projects/web/ai-blog-generator\")"
     ]
-  }
+  },
+  "customInstructions": "Strict scope mode. Only do exactly what I ask. Preserve all existing routes, pages, redirects, save behavior, navigation, and UI flow unless I explicitly request a change to them. Make the smallest possible change. Do not refactor, simplify, reorganize, clean up, or remove anything wihtout asking. If there is any chance a change affects behavior outside my request, stop and ask first."
 }

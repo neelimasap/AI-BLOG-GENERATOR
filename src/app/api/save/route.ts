@@ -24,8 +24,8 @@ export async function POST(request: Request) {
         outline,
         content,
         seo_meta,
-        image_url,
-        sources
+        image_url: image_url || null,
+        sources,
       })
       .select()
       .single();

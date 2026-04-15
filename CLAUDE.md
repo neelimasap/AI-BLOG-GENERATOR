@@ -75,6 +75,7 @@ TopicInput → create Supabase project → useWorkflowStore (Zustand)
 ## Required Environment Variables
 
 ```
+OPENROUTER_API_KEY               # outline (Gemini 2.0 Flash free) + draft (Llama 3.3 70B)
 ANTHROPIC_API_KEY
 GROQ_API_KEY
 EXA_API_KEY

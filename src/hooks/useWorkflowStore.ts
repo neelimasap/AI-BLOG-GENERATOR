@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import type { WorkflowState, ResearchResult, Outline, GeneratedImage, WorkflowStep, Tone } from '@/lib/types';
+import type { WorkflowState, ResearchResult, GeneratedImage, WorkflowStep, Tone } from '@/lib/types';
 
 const initialState = {
   projectId: null,

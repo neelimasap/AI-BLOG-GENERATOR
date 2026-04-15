@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { GenerateRequestSchema } from '@/lib/validators/schema';
-import { generateOutlineWithGemini } from '@/lib/ai/gemini';
-import { streamOutlineWithClaude, generateDraftWithClaude } from '@/lib/ai/anthropic';
+import {
+  generateDraftWithFallback,
+  generateOutlineWithFallback,
+} from '@/lib/ai/generateWithFallback';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -29,36 +31,27 @@ export async function POST(request: Request) {
       .map(s => `${s.title}\n${s.content || s.snippet}`)
       .join('\n\n---\n\n');
 
-    // Step 1: Outline with Gemini Flash (fallback to Claude Haiku)
-    let outlineText: string;
-    try {
-      outlineText = await generateOutlineWithGemini(topic, audience, tone, researchSummary);
-    } catch {
-      outlineText = await streamOutlineWithClaude(topic, audience, tone, researchSummary);
-    }
-
-    let outline;
-    try {
-      outline = JSON.parse(outlineText);
-    } catch {
-      throw new Error('Failed to parse outline JSON');
-    }
+    const { provider: outlineProvider, outline } = await generateOutlineWithFallback(
+      topic,
+      audience,
+      tone,
+      researchSummary,
+    );
     outline.title = outline.title || topic;
 
-    // Step 2: Draft with Mistral Small (non-streaming, returns complete JSON)
     const researchContext = sources
       .map(s => `## ${s.title}\n${s.content || s.snippet}`)
       .join('\n\n')
       .slice(0, 4000);
 
-    const draftText = await generateDraftWithClaude(outline, researchContext, tone, 150);
+    const { provider: draftProvider, draft } = await generateDraftWithFallback(
+      outline,
+      researchContext,
+      tone,
+      150,
+    );
 
-    let draft;
-    try {
-      draft = JSON.parse(draftText);
-    } catch {
-      throw new Error('Draft generation produced invalid JSON');
-    }
+    console.info('Generate route providers', { outlineProvider, draftProvider });
 
     return NextResponse.json(draft);
   } catch (err) {

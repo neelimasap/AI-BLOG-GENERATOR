@@ -48,7 +48,14 @@ export function ResearchResultCard({ result }: Props) {
               {result.url}
             </a>
             <Button size="sm" variant="outline"
-              onClick={(e) => { e.stopPropagation(); result.full_content ? setOpen(true) : handleScrape(); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (result.full_content) {
+                  setOpen(true);
+                  return;
+                }
+                void handleScrape();
+              }}
               disabled={scraping}>
               {scraping ? 'Scraping…' : result.full_content ? 'View' : 'Scrape'}
             </Button>
