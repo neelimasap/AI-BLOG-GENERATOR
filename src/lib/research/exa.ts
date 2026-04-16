@@ -33,7 +33,7 @@ export async function searchExa(
     type: 'keyword',
     contents: {
       text: {
-        maxCharacters: 1200,
+        maxCharacters: 2400,
       },
       summary: true,
     },

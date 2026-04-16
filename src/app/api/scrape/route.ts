@@ -3,7 +3,7 @@ import { ScrapeRequestSchema } from '@/lib/validators/schema';
 import { scrapeUrl } from '@/lib/research/firecrawl';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 20;
+export const maxDuration = 30;
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   try {
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Scrape timeout')), 15000)
+      setTimeout(() => reject(new Error('Scrape timeout')), 25000)
     );
     const content = await Promise.race([scrapeUrl(parsed.data.url), timeout]);
     return NextResponse.json({ content });

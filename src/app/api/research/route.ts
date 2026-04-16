@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { query, num_results = 10 } = parsed.data;
+    const { query, num_results = 12 } = parsed.data;
 
     // Run both searches in parallel
     const [exaResults, serpResults] = await Promise.allSettled([
@@ -21,10 +21,15 @@ export async function POST(request: Request) {
       searchSerp(query, num_results)
     ]);
 
-    const sources = [
+    const combinedSources = [
       ...(exaResults.status === 'fulfilled' ? exaResults.value : []),
       ...(serpResults.status === 'fulfilled' ? serpResults.value : [])
     ];
+
+    const sources = combinedSources.filter((source, index, allSources) => {
+      const normalizedUrl = source.url.trim().toLowerCase();
+      return index === allSources.findIndex((candidate) => candidate.url.trim().toLowerCase() === normalizedUrl);
+    });
 
     return NextResponse.json({ sources });
   } catch (err) {

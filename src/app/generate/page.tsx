@@ -220,7 +220,7 @@ export default function GeneratePage() {
       const researchRes = await fetch('/api/research', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: data.topic, num_results: 8 }),
+        body: JSON.stringify({ query: data.topic, num_results: 12 }),
       });
       if (!researchRes.ok) throw new Error('Research failed');
       const { sources: researchSources } = await researchRes.json();
@@ -229,11 +229,11 @@ export default function GeneratePage() {
       setCurrentStep('scraping');
       setProgress(40);
 
-      // Scrape top 5 in parallel — non-blocking, fall back to snippet if timeout
-      const topSources = researchSources.slice(0, 5);
+      // Scrape the strongest sources in parallel and fall back to snippets on timeout.
+      const topSources = researchSources.slice(0, 8);
       const scrapePromises = topSources.map(async (source: ResearchSource) => {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 10000);
+        const timer = setTimeout(() => controller.abort(), 15000);
         try {
           const res = await fetch('/api/scrape', {
             method: 'POST',
@@ -253,8 +253,8 @@ export default function GeneratePage() {
       });
 
       const scrapedSources = await Promise.all(scrapePromises);
-      // Merge: scraped top 5 + remaining sources with snippets for full context
-      const remainingSources = researchSources.slice(5);
+      // Merge: scraped primary sources + remaining sources with snippets for fuller context.
+      const remainingSources = researchSources.slice(8);
       const allSources = [...scrapedSources, ...remainingSources];
       setSources(allSources);
 

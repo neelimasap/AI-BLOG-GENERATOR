@@ -52,7 +52,7 @@ Tone: ${tone}
 Research (use only what is relevant to "${topic}"):
 ${researchSummary.slice(0, 4000)}
 
-Requirements: 5-8 sections, 3-5 key points each, ~1000 words total. Every section must be about "${topic}".`,
+Requirements: 5-8 sections, 3-5 key points each, ~1500 words total. Every section must be about "${topic}".`,
       },
     ],
   });

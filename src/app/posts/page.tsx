@@ -37,7 +37,7 @@ function parseOutline(raw: string) {
 
 function readingTime(content: string) {
   const words = content.trim().split(/\s+/).length;
-  return Math.max(1, Math.round(words / 200));
+  return Math.max(1, Math.ceil(words / 200));
 }
 
 function formatDate(dateStr: string) {
@@ -206,7 +206,7 @@ export default function PostsPage() {
                     {/* Gradient overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-card/80 via-transparent to-transparent" />
                     {/* Tone badge floating on image */}
-                    <span className="absolute top-3 left-3 capitalize text-xs font-semibold px-3 py-1 rounded-full bg-background/80 backdrop-blur border border-border text-foreground">
+                    <span className="absolute top-3 right-3 capitalize text-[10px] font-medium px-2 py-0.5 rounded-full bg-background/60 backdrop-blur border border-border/50 text-foreground/70">
                       {post.tone}
                     </span>
                   </div>
@@ -277,9 +277,10 @@ export default function PostsPage() {
                       <ExternalLink className="w-3 h-3" /> MD
                     </Button>
                     <Button
-                      size="sm"
+                      size="icon-sm"
                       variant="destructive"
                       onClick={(e) => deletePost(e, post.id)}
+                      aria-label={`Delete ${title}`}
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>

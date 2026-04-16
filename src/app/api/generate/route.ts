@@ -42,16 +42,18 @@ export async function POST(request: Request) {
     const researchContext = sources
       .map(s => `## ${s.title}\n${s.content || s.snippet}`)
       .join('\n\n')
-      .slice(0, 4000);
+      .slice(0, 12000);
+
+    const targetWordCount = Math.max(outline.total_estimated_words || 0, 1500);
 
     const { provider: draftProvider, draft } = await generateDraftWithFallback(
       outline,
       researchContext,
       tone,
-      150,
+      targetWordCount,
     );
 
-    console.info('Generate route providers', { outlineProvider, draftProvider });
+    console.info('Generate route providers', { outlineProvider, draftProvider, targetWordCount });
 
     return NextResponse.json(draft);
   } catch (err) {
