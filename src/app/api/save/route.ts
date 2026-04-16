@@ -51,6 +51,23 @@ export async function POST(request: Request) {
     }
 
     const supabase = getSupabaseServer();
+    const { data: existingPost, error: existingPostError } = await supabase
+      .from('generated_posts')
+      .select('*')
+      .eq('topic', topic)
+      .eq('content', content)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingPostError) {
+      throw new Error(`Supabase error: ${existingPostError.message} | code: ${existingPostError.code} | details: ${existingPostError.details}`);
+    }
+
+    if (existingPost) {
+      return NextResponse.json(existingPost, { status: 200 });
+    }
+
     const { data, error } = await supabase
       .from('generated_posts')
       .insert({

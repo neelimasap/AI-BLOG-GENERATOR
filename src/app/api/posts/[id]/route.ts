@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServer } from '@/lib/supabase/server';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type Params = { params: { id: string } };
 
@@ -12,8 +14,16 @@ export async function GET(_req: Request, { params }: Params) {
     .eq('id', params.id)
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json(data);
+  if (error) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 404, headers: { 'Cache-Control': 'no-store, max-age=0' } },
+    );
+  }
+
+  return NextResponse.json(data, {
+    headers: { 'Cache-Control': 'no-store, max-age=0' },
+  });
 }
 
 export async function DELETE(_req: Request, { params }: Params) {
